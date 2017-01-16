@@ -212,7 +212,7 @@ module Sidekiq
           signal_to_pool(sig)
         when 'HUP'
           logger.info 'Gracefully reloading pool'
-          old_pool = @pool.dup
+          @old_pool = @pool.dup
 
           # Signal old pool
           # USR1 tells Sidekiq it will be shutting down in near future.
@@ -225,7 +225,7 @@ module Sidekiq
           start_new_pool
 
           # Stop old pool
-          stop_children(old_pool)
+          stop_children(@old_pool)
           logger.info 'Graceful reload completed'
         end
       end
@@ -247,9 +247,11 @@ module Sidekiq
 
       def check_pool
         ::Process.waitpid2(-1, ::Process::WNOHANG)
-        @pool.each do |child|
-          next if alive?(child[:pid])
-          handle_dead_child(child)
+        [@old_pool, @pool].compact.each do |pool|
+          pool.each do |child|
+            next if alive?(child[:pid])
+            handle_dead_child(child)
+          end
         end
       end
 
